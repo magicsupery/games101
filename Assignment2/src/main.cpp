@@ -32,7 +32,32 @@ Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio, float z
 {
     // TODO: Copy-paste your implementation from the previous assignment.
     Eigen::Matrix4f projection;
-
+	projection = Eigen::Matrix4f::Identity();
+	float eye_fov_rad = eye_fov / 180.0f * acos(-1);
+	float t = zNear * tan(eye_fov_rad / 2.0f);
+	float r = t * aspect_ratio;
+	float b = -t;
+	float l = -r;
+	float n = -zNear;
+	float f = -zFar;
+	// frustum -> cubic
+	Eigen::Matrix4f M_p2o;
+	M_p2o << n, 0, 0, 0,
+		0, n, 0, 0,
+		0, 0, n + f, -n * f,
+		0, 0, 1, 0;
+	// orthographic projection
+	Eigen::Matrix4f M_o_shift = Eigen::Matrix4f::Identity();
+	M_o_shift(0, 3) = -(r + l) / 2.0f;
+	M_o_shift(1, 3) = -(t + b) / 2.0f;
+	M_o_shift(2, 3) = -(n + f) / 2.0f;
+	Eigen::Matrix4f M_o_scale = Eigen::Matrix4f::Identity();
+	M_o_scale(0, 0) = 2.0f / (r - l);
+	M_o_scale(1, 1) = 2.0f / (t - b);
+	M_o_scale(2, 2) = 2.0f / (n - f);
+	// squash all transformations
+	projection = M_o_scale * M_o_shift * M_p2o * projection;
+	// std::clog << "projection" << std::endl << projection << std::endl;
     return projection;
 }
 

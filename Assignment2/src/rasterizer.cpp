@@ -105,17 +105,61 @@ void rst::rasterizer::draw(pos_buf_id pos_buffer, ind_buf_id ind_buffer, col_buf
 //Screen space rasterization
 void rst::rasterizer::rasterize_triangle(const Triangle& t) {
     auto v = t.toVector4();
-    
-    // TODO : Find out the bounding box of current triangle.
-    // iterate through the pixel and find if the current pixel is inside the triangle
 
-    // If so, use the following code to get the interpolated z value.
-    //auto[alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
-    //float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
-    //float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
-    //z_interpolated *= w_reciprocal;
+	float xa = v.at(0).x();
+	float ya = v.at(0).y();
+	float xb = v.at(1).x();
+	float yb = v.at(1).y();
+	float xc = v.at(2).x();
+	float yc = v.at(2).y();
+	
+	float x1 = floor(std::min(std::min(xa, xb), xc)) * 1.0;
+	float x2 = ceil(std::max(std::max(xa, xb), xc)) * 1.0;
+		
+	float y1 = floor(std::min(std::min(ya, yb), yc)) * 1.0;
+	float y2 = ceil(std::max(std::max(ya, yb), yc)) * 1.0;
 
-    // TODO : set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
+	
+	Eigen::Vector3f ab, bc, ca;
+	ab << xb - xa, yb - ya, 0;
+	bc << xc - xb, yc - yb, 0;
+	ca << xa - xc, ya - yc, 0;
+	
+
+	Eigen::Vector3f ap, bp, cp;
+	Eigen::Vector3f point;
+	Eigen::Vector3f color = { 255, 255, 255 };
+	for (auto x = x1; x <= x2; x += 1.0)
+	{
+		for (auto y = y1; y <= y2; y += 1.0)
+		{
+			auto x_pos = x + 0.5;
+			auto y_pos = y + 0.5;
+			ap << x_pos - xa, y_pos - ya, 0;
+			bp << x_pos - xb, y_pos - yb, 0;
+			cp << x_pos - xc, y_pos - yc, 0;
+			
+			float ab_ap = ab.cross(ap).z();
+			float bc_bp = bc.cross(bp).z();
+			float ca_cp = ca.cross(cp).z();
+			if((ab_ap < 0 && bc_bp < 0 && ca_cp < 0) || 
+				(ab_ap > 0 && bc_bp > 0 && ca_cp > 0))
+			{
+				//inside
+				auto[alpha, beta, gamma] = computeBarycentric2D(x_pos, y_pos, t.v);
+				float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+				float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+				z_interpolated *= w_reciprocal;
+				point << x, y, z_interpolated;
+
+				if (-z_interpolated < depth_buf[x + y * width]) {
+					depth_buf[x + y * width] = -z_interpolated;
+					set_pixel(point, t.getColor());
+				}
+			}
+				
+		}
+	}
 }
 
 void rst::rasterizer::set_model(const Eigen::Matrix4f& m)
